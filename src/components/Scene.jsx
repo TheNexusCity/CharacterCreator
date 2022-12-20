@@ -1,291 +1,174 @@
-import { PerspectiveCamera } from "@react-three/drei/core/PerspectiveCamera"
-import { OrbitControls } from "@react-three/drei/core/OrbitControls"
-import { Canvas } from "@react-three/fiber"
-import React, { Fragment, useState, useEffect } from "react"
-import Editor from "./Editor"
-import { TemplateModel } from "./Models"
-import Selector from "./Selector"
-import MintPopup from "./MintPopup"
-import { apiService, sceneService, Contract } from "../services"
 import { MeshReflectorMaterial } from "@react-three/drei/core/MeshReflectorMaterial"
-import { useWeb3React } from "@web3-react/core"
-import { InjectedConnector } from "@web3-react/injected-connector"
+import { OrbitControls } from "@react-three/drei/core/OrbitControls"
+import { PerspectiveCamera } from "@react-three/drei/core/PerspectiveCamera"
+import { Canvas } from "@react-three/fiber"
+import React, { useRef, useState, useContext, useEffect } from "react"
 import { NoToneMapping } from "three"
-import { ethers, BigNumber } from "ethers"
-import {
-  DownloadButton,
-  MintButton,
-  WalletButton,
-  TextButton,
-  WalletImg,
-  WalletInfo,
-  Background,
-} from "../styles/Scene.styled"
-import {
-  FitParentContainer,
-  TopRightMenu,
-  ResizeableCanvas,
-} from "../styles/Globals.styled"
-import {
-  useHideStore,
-  useRotateStore,
-  useAvatar,
-  useEnd,
-  useScene,
-  useTemplateInfo,
-  useModel,
-  useControls,
-  useCamera,
-  useConfirmWindow,
-  useMintLoading,
-  useMintStatus,
-  useModelClass,
-  useModelingStore,
-  useMintDone,
-  useLoading,
-} from "../store"
+import Editor from "./Editor"
+import Selector from "./Selector"
+import { addModelData, getSkinColor } from "../library/utils"
+import * as THREE from "three"
+import { SceneContext } from "../context/SceneContext"
 
-import logo from "../../public/ui/weba.png"
+import { AnimationManager } from "../library/animationManager"
+import { ViewContext, ViewStates } from "../context/ViewContext"
 
-export default function Scene({ type }) {
-  const [showType, setShowType] = useState(false)
+import styles from "./Scene.module.css"
 
-  const [connected, setConnected] = useState(false)
-  const [ensName, setEnsName] = useState("")
-  const setTemplateInfo = useTemplateInfo((state) => state.setTemplateInfo)
-  const setLoading = useLoading((state) => state.setLoading)
-  const isRotate = useRotateStore((state) => state.isRotate)
-  const ishidden = useHideStore((state) => state.ishidden)
-  const avatar = useAvatar((state) => state.avatar)
-  const scene = useScene((state) => state.scene)
-  const model = useModel((state) => state.model)
-  const setControls = useControls((state) => state.setControls)
-  const setCamera = useCamera((state) => state.setCamera)
-  const setConfirmWindow = useConfirmWindow((state) => state.setConfirmWindow)
-  const setMintLoading = useMintLoading((state) => state.setMintLoading)
-  const setMintStatus = useMintStatus((state) => state.setMintStatus)
-  const setSelectedCharacterClass = useModelClass((state) => state.setSelectedCharacterClass)
-  const setEnd = useEnd((state) => state.setEnd)
-  const formatModeling = useModelingStore((state) => state.formatModeling)
-  const formatComplete = useModelingStore((state) => state.formatComplete)
-  const setMintDone = useMintDone((state) => state.setMintDone)
-  const { activate, deactivate, library, account } = useWeb3React()
-  const injected = new InjectedConnector({
-    supportedChainIds: [137, 1, 3, 4, 5, 42, 97],
-  })
+export default function Scene() {
+  const {
+    scene,
+    setScene,
+    setCamera,
+    loadModel,
+    currentTemplate,
+    model,
+    template,
+    setModel,
+    camera
+  } = useContext(SceneContext)
+  const {currentView, setCurrentView} = useContext(ViewContext)
+  const neckMovement = 30;
+  const spineMovement = 5;
+  const leftEyeMovement = 80;
+  const rightEyeMovement = 80;
 
-  const canvasStyle = { width: "100vw", display: "flex", position: "absolute" }
+  const [loading, setLoading] = useState(false)
+  const controls = useRef()
+  const templateInfo = template && currentTemplate && template[currentTemplate.index]
+  const [neck, setNeck] = useState({});
+  const [spine, setSpine] = useState({});
+  const [left, setLeft] = useState({});
+  const [right, setRight] = useState({});
 
-  const reset = () => {
-    setLoading(true);
-    setSelectedCharacterClass(0);
-    setEnd(false);
-    formatModeling();
-    formatComplete();
-    setTemplateInfo({file:null, format:null, bodyTarget:null})
+  // if currentView is CREATOR_LOADING, show loading screen
+  // load the assets
+  // once templateInfo, currentTemplate, and models are loaded, move to CREATOR view
+
+  const  getMouseDegrees = (x, y, degreeLimit) =>  {
+      let dx = 0,
+          dy = 0,
+          xdiff,
+          xPercentage,
+          ydiff,
+          yPercentage;
+    
+      let w = { x: window.innerWidth, y: window.innerHeight };
+    
+   
+      if (x <= w.x / 2) {
+        // 2. Get the difference between middle of screen and cursor position
+        xdiff = w.x / 2 - x;  
+        // 3. Find the percentage of that difference (percentage toward edge of screen)
+        xPercentage = (xdiff / (w.x / 2)) * 100;
+        // 4. Convert that to a percentage of the maximum rotation we allow for the neck
+        dx = ((degreeLimit * xPercentage) / 100) * -1; }
+      if (x >= w.x / 2) {
+        xdiff = x - w.x / 2;
+        xPercentage = (xdiff / (w.x / 2)) * 100;
+        dx = (degreeLimit * xPercentage) / 100;
+      }
+      if (y <= w.y / 2) {
+        ydiff = w.y / 2 - y;
+        yPercentage = (ydiff / (w.y / 2)) * 100;
+        // Note that I cut degreeLimit in half when she looks up
+        dy = (((degreeLimit * 0.5) * yPercentage) / 100) * -1;
+        }
+      if (y >= w.y / 2) {
+        ydiff = y - w.y / 2;
+        yPercentage = (ydiff / (w.y / 2)) * 100;
+        dy = (degreeLimit * yPercentage) / 100;
+      }
+      return { x: dx, y: dy };
   }
 
-  const connectWallet = async () => {
-    try {
-      await activate(injected)
-      setMintStatus("Your wallet has been connected.")
-    } catch (ex) {
-      console.log(ex)
+  const handleMouseMove = (event) => {
+    if (neck && spine) {
+      moveJoint(event, neck, neckMovement);
+      moveJoint(event, spine, spineMovement);
+      moveJoint(event, left, leftEyeMovement);
+      moveJoint(event, right, rightEyeMovement);
+    }
+  };
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [handleMouseMove]);
+
+  const moveJoint = (mouse, joint, degreeLimit) => {
+    if(Object.keys(joint).length !== 0 ){
+      let degrees = getMouseDegrees(mouse.x, mouse.y, degreeLimit);
+        joint.rotation.y = THREE.MathUtils.degToRad(degrees.x);
+        joint.rotation.x = THREE.MathUtils.degToRad(degrees.y);
     }
   }
 
   useEffect(() => {
-    if (account) {
-      _setAddress(account)
-      setConnected(true)
-    } else {
-      setConnected(false)
-      setMintStatus("Please connect your wallet.")
-    }
-  }, [account])
-
-  const _setAddress = async (address) => {
-    const { name, avatar } = await getAccountDetails(address)
-    console.log("ens", name)
-    setEnsName(name ? name.slice(0, 15) + "..." : "")
-  }
-
-  const getAccountDetails = async (address) => {
-    const provider = ethers.getDefaultProvider("mainnet", {
-      alchemy: import.meta.env.VITE_ALCHEMY_API_KEY,
-    })
-    const check = ethers.utils.getAddress(address)
-
-    try {
-      const name = await provider.lookupAddress(check)
-      if (!name) return {}
-      return { name }
-    } catch (err) {
-      console.warn(err.stack)
-      return {}
-    }
-  }
-
-  const disConnectWallet = async () => {
-    try {
-      deactivate()
-      setConnected(false)
-    } catch (ex) {
-      console.log(ex)
-    }
-  }
-
-  const handleDownload = () => {
-    showType ? setShowType(false) : setShowType(true)
-  }
-
-  const download = (format, type) => {
-    sceneService.download(model, `UpstreetAvatars_${type}`, format, false)
-  }
-
-  const mintAsset = async () => {
-    if (account == undefined) {
-      setMintStatus("Please connect the wallet")
-      setConfirmWindow(true)
+    if(!templateInfo) {
+      if(!loading) setLoading(true)
       return
     }
-    //setMintCost(10);
-    setConfirmWindow(true)
-    setMintStatus("Uploading...")
-    setMintLoading(true)
 
-    sceneService.getScreenShot().then(async (screenshot) => {
-      if (screenshot) {
-        const imageHash = await apiService
-          .saveFileToPinata(screenshot, "AvatarImage_" + Date.now() + ".png")
-          .catch((reason) => {
-            console.error(reason)
-            setMintStatus("Couldn't save to pinata")
-            setMintLoading(false)
-          })
-        sceneService.getModelFromScene().then(async (glb) => {
-          const glbHash = await apiService.saveFileToPinata(
-            glb,
-            "AvatarGlb_" + Date.now() + ".glb",
-          )
-          const attributes = getAvatarTraits()
-          const metadata = {
-            name: "Avatars",
-            description: "Creator Studio Avatars.",
-            image: `ipfs://${imageHash.IpfsHash}`,
-            animation_url: `ipfs://${glbHash.IpfsHash}`,
-            attributes,
+    loadModel(templateInfo.file).then(async (vrm) => { 
+      const animationManager = new AnimationManager(templateInfo.offset)
+      addModelData(vrm, { animationManager: animationManager })
+
+      if (templateInfo.animationPath) {
+        await animationManager.loadAnimations(templateInfo.animationPath)
+        animationManager.startAnimation(vrm)
+      }
+      addModelData(vrm, { cullingLayer: 0 })
+
+      vrm.scene.traverse(o => {
+          if (o.isMesh) {
+            o.castShadow = true;
+            o.receiveShadow = true;
           }
-          const str = JSON.stringify(metadata)
-          const metaDataHash = await apiService.saveFileToPinata(
-            new Blob([str]),
-            "AvatarMetadata_" + Date.now() + ".json",
-          )
-          await mintNFT("ipfs://" + metaDataHash.IpfsHash)
-        })
-      }
-    })
-  }
-
-  const getAvatarTraits = () => {
-    let metadataTraits = []
-    Object.keys(avatar).map((trait) => {
-      if (Object.keys(avatar[trait]).length !== 0) {
-        metadataTraits.push({
-          trait_type: trait,
-          value: avatar[trait].traitInfo.name,
-        })
-      }
-    })
-    return metadataTraits
-  }
-
-  const mintNFT = async (metadataIpfs) => {
-    setMintStatus("Minting...")
-    const chainId = 1 // 1: ethereum mainnet, 4: rinkeby 137: polygon mainnet 5: // Goerli testnet
-    if (window.ethereum.networkVersion !== chainId) {
-      try {
-        await window.ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x1" }], // 0x4 is rinkeby. Ox1 is ethereum mainnet. 0x89 polygon mainnet  0x5: // Goerli testnet
-        })
-      } catch (err) {
-        // notifymessage("Please check the Ethereum mainnet", "error");
-        setMintStatus("Please check the Polygon mainnet")
-        setMintLoading(false)
-        return false
-      }
-    }
-    const signer = new ethers.providers.Web3Provider(
-      window.ethereum,
-    ).getSigner()
-    const contract = new ethers.Contract(Contract.address, Contract.abi, signer)
-    const isActive = await contract.saleIsActive()
-    if (!isActive) {
-      setMintStatus("Mint isn't Active now!")
-      setMintLoading(false)
-    } else {
-      const tokenPrice = await contract.tokenPrice()
-      try {
-        const options = {
-          value: BigNumber.from(tokenPrice).mul(1),
-          from: account,
+          // Reference the neck and spine bones
+          if (o.isBone && o.name === 'neck') { 
+            setNeck(o);
+          }
+          if (o.isBone && o.name === 'spine') { 
+             setSpine(o);
+          }
+          if (o.isBone && o.name === 'leftEye') { 
+            setLeft(o);
+         }
+         if (o.isBone && o.name === 'rightEye') { 
+          setRight(o);
         }
-        const tx = await contract.mintToken(1, metadataIpfs, options)
-        let res = await tx.wait()
-        if (res.transactionHash) {
-          setMintStatus("Mint success!")
-          setMintDone(true)
-          setMintLoading(false)
-        }
-      } catch (err) {
-        setMintStatus("Public Mint failed! Please check your wallet.")
-        setMintLoading(false)
-      }
-    }
-  }
-  const leftPadding = ishidden ? 200 : 700
+        });
 
-  return (
-    <FitParentContainer>
-      <Background>
-        <div
-          id={"webamark"}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            width: "100vw",
-            height: "100vh",
-          }}
-        >
-          <img
-            src={logo}
-            style={{
-              // place in the center of the screen
-              position: "absolute",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "100vh",
-              height: "100vh",
-              opacity: 0.05,
-            }}
-          />
-        </div>
-        <ResizeableCanvas left={0} right={0}>
+      getSkinColor(vrm.scene, templateInfo.bodyTargets)
+      setModel(vrm)
+      setTimeout(() => {
+      scene.add(vrm.scene)
+      }, 1)
+      setCurrentView(ViewStates.CREATOR)
+    })
+    
+    return () => {
+      if(model !== null) {
+        scene.remove(model.scene)
+      }
+      setModel(null)
+      setScene(new THREE.Scene())
+    }
+
+  }, [templateInfo])
+
+  return templateInfo && (
+      <div className={styles["FitParentContainer"]}>
           <Canvas
-            id = "editor-scene"
-            style = {canvasStyle}
-            gl={{ antialias: true, toneMapping: NoToneMapping}}
+            id="editor-scene"
+            className={styles["canvasStyle"]}
+            gl={{ antialias: true, toneMapping: NoToneMapping }}
             camera={{ fov: 30, position: [0, 1.3, 2] }}
           >
             <ambientLight color={[1, 1, 1]} intensity={0.5} />
 
             <directionalLight
-              //castShadow = {true}
               intensity={0.5}
-              //color = {[0.5,0.5,0.5]}
               position={[3, 1, 5]}
               shadow-mapSize={[1024, 1024]}
             >
@@ -299,24 +182,28 @@ export default function Scene({ type }) {
             </directionalLight>
 
             <OrbitControls
-              ref={setControls}
+              ref={controls}
               minDistance={1}
               maxDistance={4}
               maxPolarAngle={Math.PI / 2 - 0.1}
               enablePan={true}
-              autoRotate={isRotate}
               autoRotateSpeed={5}
               enableDamping={true}
               dampingFactor={0.1}
               target={[0, 1.1, 0]}
             />
+
             <PerspectiveCamera
               ref={setCamera}
               aspect={1200 / 600}
               fov={30}
               onUpdate={(self) => self.updateProjectionMatrix()}
             >
-              <TemplateModel scene={scene} />
+
+            <mesh>
+              <primitive object={scene} />
+            </mesh>
+
               <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
                 <circleGeometry args={[0.6, 64]} />
                 <MeshReflectorMaterial
@@ -334,49 +221,8 @@ export default function Scene({ type }) {
               </mesh>
             </PerspectiveCamera>
           </Canvas>
-        </ResizeableCanvas>
-      </Background>
-      <TopRightMenu>
-        {showType && (
-          <Fragment>
-            <TextButton onClick={() => download("vrm", type)}>
-              <span>VRM</span>
-            </TextButton>
-            <TextButton onClick={() => download("glb", type)}>
-              <span>GLB</span>
-            </TextButton>
-          </Fragment>
-        )}
-
-        <DownloadButton onClick={handleDownload} />
-        <MintButton
-          onClick={() => {
-            setConfirmWindow(true)
-          }}
-        />
-        <WalletButton
-          connected={connected}
-          onClick={connected ? disConnectWallet : connectWallet}
-        >
-          {connected ? (
-            <WalletInfo ens={ensName}>
-              {ensName ? ensName : account ? account.slice(0, 15) + "..." : ""}
-            </WalletInfo>
-          ) : (
-            ""
-          )}
-          <WalletImg />
-        </WalletButton>
-      </TopRightMenu>
-      <div>
-        <Selector />
-        <Editor backCallback={reset} />
+          {currentTemplate && templateInfo && <Selector templateInfo={templateInfo} />}
+        <Editor templateInfo={templateInfo} controls={controls.current} />
       </div>
-      <MintPopup
-        connected={connected}
-        connectWallet={connectWallet}
-        mintAsset={mintAsset}
-      />
-    </FitParentContainer>
   )
 }

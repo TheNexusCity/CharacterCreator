@@ -1,40 +1,37 @@
-import React, { Fragment } from "react"
-import { sceneService } from "../services"
+import React, { Fragment, useEffect, useContext } from "react"
 import { RgbColorPicker  } from "react-colorful";
 import { useState } from "react"
 import skinSelector from '../../public/ui/skinSelector/Vector.png'
-import { useColorStatus, useScene, useTemplateInfo } from "../store";
+import { SceneContext } from "../context/SceneContext"
+import { setMaterialColor } from "../library/utils"
 
-function Skin({ category, avatar}) {
+import styles from './Skin.module.css'
+
+function Skin({ templateInfo, currentTraitName, avatar}) {
   const [color, setColor] = useState("#aabbcc");
   const [checked, setChecked] = useState();
   const [colorPicker, setColorPick] = useState(false);
-  const colorStatus = useColorStatus((state) => state.colorStatus)
-  const setColorStatus = useColorStatus((state) => state.setColorStatus)
-  const scene = useScene((state) => state.scene)
-  const templateInfo = useTemplateInfo((state) => state.templateInfo);
-  const container = {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    margin: "0.5rem 0"
-  }
-  const btn = {
-    width : "56.53px",
-    height : "56.54px",
-    display: "flex",
-    justifyContent:"center",
-    alignItems:"center",
-    cursor: "pointer",
-  }
 
-  React.useEffect(() => {
+  console.log('currentTraitName', currentTraitName)
+
+  const {
+    skinColor,
+    setSkinColor,
+    colorStatus,
+    setColorStatus,
+    scene,
+  } = useContext(SceneContext);
+
+  useEffect(() => {
     setChecked(colorStatus)
   }, [templateInfo])
 
   const getHairMaterial = () => {
      let material = [];
      const hairModel = avatar.head.model;
+    console.log('hairModel', hairModel)
+    console.log('avatar.head', avatar.head)
+
       hairModel.traverse((o)=> {
         if(o.isSkinnedMesh){
           material = [...material, o.name]
@@ -47,19 +44,19 @@ function Skin({ category, avatar}) {
     setChecked(value)
     const rgbColor = hexToRgbA(value)
     let colorTargets;
-    if(category === "head"){
+    if(currentTraitName === "head"){
       colorTargets = getHairMaterial();
     }
-    if(category === "eyeColor"){
+    if(currentTraitName === "eyeColor"){
       colorTargets = templateInfo.EyeTargets;
     }
-    if(category === "color"){
+    if(currentTraitName === "color"){
       colorTargets = templateInfo.bodyTargets;
     }
     for (const bodyTarget of colorTargets) {
-      sceneService.setMaterialColor(scene, value, bodyTarget)
+      setMaterialColor(scene, value, bodyTarget)
       setColorStatus(value)
-      sceneService.setSkinColor(value)
+      setSkinColor(value)
     }
   }
 
@@ -98,25 +95,16 @@ function Skin({ category, avatar}) {
       throw new Error('Bad Hex');
   }
 
-  return (
-    <div 
-      style={{ 
-        ...container,
-        display: 'grid',
-        gridTemplateColumns: 'repeat(8, 1fr)',
-        gridGap: '0px',
-        margin: 'auto',
-        marginTop: '40px',
-      }}
-    >
-    {colorArray[category].map((row, i) => {
+  console.log('currentTraitName', currentTraitName);
+  console.log('colorArray', colorArray);
+  console.log('colorArray[currentTraitName]', colorArray[currentTraitName])
+
+  return currentTraitName && (
+    <div className={styles['container']} >
+    {colorArray[currentTraitName].map((row, i) => {
       return row.map((col, k) => 
         (
-          <div 
-            style={{
-              ...btn,
-              backgroundColor: col,
-            }}  onClick={() => handleChangeSkin(col)} key={i * row.length + k}>
+          <div className={styles['btn']} style={{ backgroundColor: col}} onClick={() => handleChangeSkin(col)} key={i * row.length + k}>
            {(checked == col) && <img src={skinSelector}/>}
           </div>
         )
