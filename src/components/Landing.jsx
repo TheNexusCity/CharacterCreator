@@ -1,22 +1,23 @@
+/* eslint-disable react/no-unknown-property */
 import {
   BrightnessContrast,
   EffectComposer,
-  Glitch,
+  Glitch
 } from "@react-three/postprocessing"
 import { GlitchMode } from "postprocessing"
-import React, { useEffect, useContext, useState } from "react"
+import React, { useContext, useEffect, useState } from "react"
 import useSound from "use-sound"
 import clickUrl from "../../public/sound/class_click.wav"
 import passUrl from "../../public/sound/class_pass.wav"
-import logo from "../../public/ui/landing/logo.png"
 import { AudioContext } from "../context/AudioContext"
 
 import { PerspectiveCamera } from "@react-three/drei/core/PerspectiveCamera"
 import { Canvas } from "@react-three/fiber"
-import { AnimationManager } from "../library/animationManager"
 import { SceneContext } from "../context/SceneContext"
 import { ViewContext, ViewStates } from "../context/ViewContext"
+import { AnimationManager } from "../library/animationManager"
 
+import CustomButton from "./custom-button"
 import styles from "./Landing.module.css"
 
 const dropHunter = "../3d/models/landing/drop-noWeapon.vrm"
@@ -119,7 +120,7 @@ export default function Landing() {
     currentView.includes("LANDER") && (
       <div className={styles["StyledLanding"]}>
         <div
-          className={styles["drophunter-container"]}
+          className={[styles["selection-box"], styles["right"]].join(" ")}
           onMouseEnter={() => {
             setSelectedAvatar(drophunter)
           }}
@@ -128,24 +129,26 @@ export default function Landing() {
               setSelectedAvatar(null)
             }
           }}
-          // on mouse click
-          onClick={() => {
-            handleClick(Classes.DROPHUNTER)
-          }}
         >
-          <div className={styles["drophunter"]}>
-            <img
-              style={{
-                opacity: selectedAvatar === drophunter ? 1 : 0.5,
-                maxWidth: "30vh",
-                minWidth: "30em",
+          <div className={styles.backdrop} />
+          <div className={styles["box"]}>
+            <h2>Drop Hunter</h2>
+            <p>
+              +ATK +SPD // SUPERCHARGER
+            </p>
+            <CustomButton
+              theme="light"
+              text="Select"
+              icon="classDropHunter"
+              size={16}
+              onClick={() => {
+                handleClick(Classes.DROPHUNTER)
               }}
-              src={"./DropHunter.svg"}
             />
           </div>
         </div>
         <div
-          className={styles["neurohacker-container"]}
+          className={[styles["selection-box"], styles["left"]].join(" ")}
           onMouseEnter={() => {
             setSelectedAvatar(neurohacker)
           }}
@@ -154,29 +157,30 @@ export default function Landing() {
               setSelectedAvatar(null)
             }
           }}
-          // on mouse click
-          onClick={() => {
-            handleClick(Classes.NEUROHACKER)
-          }}
         >
-          <div className={styles["neurohacker"]}>
-            <img src={"./Neurohacker.svg"} />
+          <div className={styles.backdrop} />
+          <div className={styles["box"]}>
+            <h2>Neuro Hacker</h2>
+            <p>
+              +ATK +SPR // STEALTH ATTACK
+            </p>
+            <CustomButton
+              theme="light"
+              text="Select"
+              icon="classNeuralHacker"
+              size={16}
+              onClick={() => {
+                handleClick(Classes.NEUROHACKER)
+              }}
+            />
           </div>
         </div>
 
-        <div className={styles["titleAnimation"]}>
-          <div className={styles["topBanner"]}>
-            <img className={styles["webaverse-text"]} src={logo} />
-            <div className={styles["studio"]}>Character Studio</div>
-          </div>
-          <div className={styles["subTitle"]}>
-            <div className={styles["subTitle-text"]}>
-              Pick a Class
-              <div className={styles["subTitle-desc"]}>
-                {" "}
-                You will be able to customize in a moment.
-              </div>
-            </div>
+        <div className={styles["subTitle-text"]}>
+          Pick a Class
+          <div className={styles["subTitle-desc"]}>
+            {" "}
+            You will be able to customize in a moment.
           </div>
         </div>
         <Canvas

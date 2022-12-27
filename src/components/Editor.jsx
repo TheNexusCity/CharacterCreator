@@ -1,16 +1,13 @@
-import React, { useContext } from "react"
+import React, { useContext } from "react";
 
-import useSound from 'use-sound';
 import gsap from 'gsap';
+import useSound from 'use-sound';
+import optionClick from "../../public/sound/option_click.wav";
 import shuffle from "../../public/ui/traits/shuffle.png";
-import { BackButton } from "./BackButton";
-import optionClick from "../../public/sound/option_click.wav"
-import { ViewContext } from "../context/ViewContext";
 import { AudioContext } from "../context/AudioContext";
 import { SceneContext } from "../context/SceneContext";
-import { ViewStates } from "../context/ViewContext";
 
-import styles from './Editor.module.css'
+import styles from './Editor.module.css';
 
 export default function Editor({templateInfo, controls}) {
   const {currentTraitName, setCurrentTraitName} = useContext(SceneContext);
@@ -25,7 +22,9 @@ export default function Editor({templateInfo, controls}) {
   );
 
   const selectOption = (option) => {
-    if (option.name == currentTraitName){ 
+    !isMute && play();
+    if (option.name === currentTraitName){ 
+      console.log('option.name === currentTraitName')
       if (cameraFocused) {
         moveCamera(option.cameraTarget);
         setCameraFocused(false);
@@ -34,12 +33,15 @@ export default function Editor({templateInfo, controls}) {
         moveCamera({height:0.8, distance:3.2});
         setCameraFocused(true);
       }
+      setCurrentTraitName(null)
+      return;
+    } else {
+      console.log('optoin.name !== currentTraitName', option.name, currentTraitName)
     }
 
     moveCamera(option.cameraTarget);
     setCurrentTraitName(option.name)
     
-    !isMute && play();
   }
 
   const moveCamera = (value) => {
@@ -76,37 +78,19 @@ export default function Editor({templateInfo, controls}) {
       })
   }
 
-  const { setCurrentView } = useContext(ViewContext)
-
-  const {
-    setCurrentTemplate,
-  } = useContext(SceneContext)
-
   return(
   <div className={styles['SideMenu']}>
-        <div className={styles['MenuTitle']}>
-          <BackButton onClick={() => {
-            console.log('BackButton')
-            setCurrentTemplate(null)
-            setCurrentView(ViewStates.LANDER_LOADING)
-            console.log('ViewStates.LANDER_LOADING', ViewStates.LANDER_LOADING)
-          }}/>
-        </div>
-
-        <div className={styles['LineDivision']} bottom = {'20px'}/>
-
         {templateInfo.traits && templateInfo.traits.map((item, index) => (
           <div className={styles['MenuOption']}
             onClick = {()=>{
               selectOption(item)
             }} 
-            active={currentTraitName === item.name}
             key = {index}>
             <img className={currentTraitName !== item.name ? styles['MenuImg'] : styles['MenuImgActive']} src={templateInfo.traitIconsDirectory + item.icon} />
           </div>
         ))}
 
-        <div className={styles['LineDivision']} top = {'20px'}/>
+        <div className={styles['LineDivision']}/>
         <img className={styles['ShuffleOption']} onClick={() => {!isMute && play(); }} src={shuffle} />
   </div>);
 }

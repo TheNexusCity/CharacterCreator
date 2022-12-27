@@ -7,20 +7,19 @@ import { AudioProvider } from "./context/AudioContext"
 import Landing from "./components/Landing"
 import { UserMenu } from "./components/UserMenu"
 
-import AudioButton from "./components/AudioButton"
 import Scene from "./components/Scene"
-import { ViewProvider } from "./context/ViewContext"
+import { ViewProvider, ViewContext, ViewStates } from "./context/ViewContext"
 import { SceneContext, SceneProvider } from "./context/SceneContext"
 import { AccountProvider } from "./context/AccountContext"
 import MintPopup from "./components/MintPopup"
-
-import Gate from "./components/Gate"
+// import Gate from "./components/Gate"
 
 // dynamically import the manifest
 const assetImportPath = import.meta.env.VITE_ASSET_PATH + "/manifest.json"
 
 function App() {
   const { template, setTemplate } = useContext(SceneContext)
+  const { setCurrentView } = useContext(ViewContext)
   // fetch the manifest, then set it
   useEffect(() => {
     async function fetchManifest() {
@@ -31,17 +30,18 @@ function App() {
 
     fetchManifest().then((data) => {
       setTemplate(data)
+      setCurrentView(ViewStates.LANDER_LOADING)
     })
   }, [])
   return (
     template && (
       <Fragment>
         <Background />
-        <Gate />
+        {/* <Gate /> */}
+
         <Landing />
-        <AudioButton />
         <Scene />
-        <MintPopup />
+        {/* <MintPopup /> */}
         <UserMenu />
       </Fragment>
     )

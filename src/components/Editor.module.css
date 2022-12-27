@@ -1,13 +1,15 @@
 .SideMenu {
     position: absolute;
-    left: 50px;
-    top: 10%;
-    width: 100px;
+    left: 2em;
+    top: 20vh;
+    height: 60vh;
+    height: 36em;
     border: 1px solid #38404E;
     border-radius : 5px;
     backdrop-filter: blur(22.5px); 
     box-sizing : border-box;
-    transform: perspective(400px) rotateY(5deg);
+    transform: perspective(70vh) rotateY(5deg);
+    backdrop-filter: blur(22.5px);
     user-select : none;
 }
 
@@ -31,12 +33,10 @@
     margin:auto;
     src: '';
     display: flex;
-    height: 6em;
-    width: 6em;
     margin-left: auto;
     margin-right: auto;
-    margin-bottom: .25em;
-    margin-top: .25em;
+    margin-bottom: .5em;
+    margin-top: .5em;
 }
 
 .MenuImg:hover {
@@ -44,7 +44,9 @@
 }
 
 .MenuOption {
-    width: 100%;
+    width: 3.5em;
+    margin: .25em;
+    margin-bottom: 1em;
 }
 
 .MenuOptionSelected {
@@ -64,8 +66,6 @@
     margin:auto;
     src: '';
     display: flex;
-    height: 6em;
-    width: 6em;
     margin-left: auto;
     margin-right: auto;
     margin-bottom: .25em;
@@ -75,8 +75,9 @@
 .ShuffleOption {
     border-right: '';
     opacity: 1;
-    height: 30px;
-    width: 30px;
+    height: 2.5em;
+    width: 2.5em;
+    padding: .5em;
     display: flex;
     margin-left: auto;
     margin-right: auto;
@@ -85,9 +86,9 @@
 .MenuTitle {
     display: inline-block;
     text-align: center;
-    height: 70px;
-    width: 85%;
+    height: 3.5em;
+    width: 100%;
     text-align: center;
-    margin: .25em auto .25em auto;
+    margin: 0 auto .25em auto;
     user-select: none;
 }

@@ -1,8 +1,8 @@
-import React, { useEffect, Fragment, useState, useContext } from "react"
+import React, { useContext, useEffect, useState } from "react"
 import * as THREE from "three"
 import useSound from "use-sound"
 import cancel from "../../public/ui/selector/cancel.png"
-import { disposeVRM, addModelData } from "../library/utils"
+import { addModelData, disposeVRM } from "../library/utils"
 
 import sectionClick from "../../public/sound/section_click.wav"
 import tick from "../../public/ui/selector/tick.svg"
@@ -17,11 +17,11 @@ export default function Selector() {
     avatar,
     setAvatar,
     currentTemplate,
-    scene,
-    setCurrentTraitName,
     currentTraitName,
     template,
     model,
+    setTraitsNecks,
+    setTraitsSpines
   } = useContext(SceneContext)
   const currentTemplateIndex = parseInt(currentTemplate.index)
   const templateInfo = template[currentTemplateIndex]
@@ -29,11 +29,7 @@ export default function Selector() {
   const traitTypes = templateInfo.traits.map((trait) => trait.name)
   const { isMute } = useContext(AudioContext)
 
-  const [texture, setTexture] = useState(null)
-
   const [selectValue, setSelectValue] = useState("0")
-  const [loadingTraitOverlay, setLoadingTraitOverlay] = useState(false)
-  const [loadedPercent, setLoadedPercent] = useState(0)
 
   const getAsArray = (target) => {
     if (target == null) return []
@@ -59,7 +55,7 @@ export default function Selector() {
     // filter by item.name === currentTraitName
     traits
       .filter((item) => item.name === currentTraitName)
-      .map((item) => {
+      .map(() => {
         const currentTrait = traits.find((t) => t.name === currentTraitName);
         // find the key that matches the current trait.textureCollection
         const newAsset = currentTrait.collection.find((t) => {
@@ -67,46 +63,58 @@ export default function Selector() {
           return t.textureCollection === trait.textureCollection
         })
 
-        console.log('newModel', newAsset)
-
         const localDir = newAsset.directory
         const model = templateInfo.traitsDirectory + localDir
-
-        // get the textureCollection
-        const textureCollection = model.textureCollection
-        console.log('textureCollection', textureCollection)
-
-        console.log('templateInfo.textureCollections', templateInfo.textureCollections)
-
-        const textureCollectionData = templateInfo.textureCollections.find((t) => {
-          return t.name === textureCollection
-        }).collection;
-
-        console.log('textureCollectionData', textureCollectionData)
-
-        const texture = templateInfo.traitsDirectory + textureCollectionData[textureIndex].directory
-
-        console.log('texture', texture)
 
         // if avatar has a trait, dispose it
         if (avatar[currentTraitName] && avatar[currentTraitName].vrm) {
           disposeVRM(avatar[currentTraitName].vrm)
         }
 
+        // get the textureCollection
+        const textureCollection = newAsset.textureCollection
+        console.log('model is', model, 'newAsset is', newAsset)
+
+        // if there is no texture collection, just load the model-- the texture is on the model
+        if(!textureCollection) {
+          console.log('no texture collection, setting avatar')
+          itemLoader(model, newAsset).then((newTrait) => {
+            setAvatar({...avatar, ...newTrait});
+          })
+          return;
+        }
+
+        // if there is a texture collection, there are multiple textures to choose from
+        const textureCollectionData = templateInfo.textureCollections.find((t) => {
+          return t.trait === textureCollection
+        });
+
+        if(!textureCollectionData) 
+        {
+          itemLoader(model, newAsset).then((newTrait) => {
+            setAvatar({...avatar, ...newTrait});
+          })
+          return;
+        }
+      
+        const collection = textureCollectionData.collection
+
+        const texture = collection[textureIndex] && (templateInfo.traitsDirectory + collection[textureIndex].directory)
+
         // load the texture with THREE.TextureLoader
         const textureLoader = new THREE.TextureLoader()
-        textureLoader.load(texture, (texture) => {
-        itemLoader(model, texture).then((newTrait) => {
+        textureLoader.load(texture, (t) => {
+          t.flipY = false;
+          itemLoader(model, newAsset, t).then((newTrait) => {
           setAvatar({...avatar, ...newTrait});
         })
       })
-      })
+    })
   }
 
-  const itemLoader = async (item, texture) => {
+  const itemLoader = async (item, newAsset, texture) => {
     let r_vrm
     const vrm = await loadModel(item)
-
     // 1 
 
     addModelData(vrm, {
@@ -119,11 +127,17 @@ export default function Selector() {
         model.data.animationManager.startAnimation(vrm)
       }
 
-        // add texture
+        // add texture and neck and spine bone to context
         vrm.scene.traverse((child) => {
           if (child.isMesh) {
             child.material[0].map = texture
             child.material[0].shadeMultiplyTexture = texture
+          }
+          if (child.isBone && child.name == 'neck') { 
+            setTraitsNecks(current => [...current , child])
+           }
+          if (child.isBone && child.name == 'spine') { 
+            setTraitsSpines(current => [...current , child])
           }
         })
 
@@ -137,11 +151,10 @@ export default function Selector() {
       const newAvatarData = { ...avatar }
       newAvatarData[currentTraitName] = {
         traitInfo: item,
+        name: newAsset.name,
         model: vrm.scene,
         vrm: vrm,
       }
-
-      console.log('doing stuff')
 
       // search in the trait data for restricted traits and restricted types  => (todo)
         if (traitData.restrictedTraits) {
@@ -204,7 +217,6 @@ export default function Selector() {
             // we should check every type this trait has
             for (let i = 0; i < itemTypes.length; i++) {
               const itemType = itemTypes[i]
-              console.log(itemType)
               // and get the restriction included in each array if exists
               const typeRestrictions = getAsArray(
                 templateInfo.typeRestrictions[itemType],
@@ -265,14 +277,13 @@ export default function Selector() {
         }
       }
 
-      //texture area
       setTimeout(() => {
         model.scene.add(vrm.scene)
-      }, 1)
-    console.log("trait is", currentTraitName)
+      }, 60)
     return {
       [currentTraitName]: {
         traitInfo: item,
+        name: newAsset.name,
         model: r_vrm.scene,
         vrm: r_vrm,
       },
@@ -282,10 +293,6 @@ export default function Selector() {
   const [play] = useSound(sectionClick, { volume: 1.0 })
 
   useEffect(() => {
-    console.log("")
-
-    console.log("templateInfo.traits is", templateInfo.traits)
-    console.log("traitTypes is", traitTypes)
     let buffer = { ...(avatar ?? {}) }
 
     ;(async () => {
@@ -293,7 +300,7 @@ export default function Selector() {
       // for trait in traits
       for (const property in buffer) {
         if (buffer[property].vrm) {
-          if (newAvatar[property].vrm != buffer[property].vrm) {
+          if (newAvatar[property] && newAvatar[property].vrm != buffer[property].vrm) {
             if (newAvatar[property].vrm != null) {
               disposeVRM(newAvatar[property].vrm)
             }
@@ -331,7 +338,7 @@ export default function Selector() {
         <img
           className={styles["icon"]}
           src={cancel}
-          style={{ width: "3em", height: "3em" }}
+          style={{ width: "4em", height: "4em" }}
         />
       </div>
     )
@@ -350,15 +357,12 @@ export default function Selector() {
                   const active = selectValue === item.id
                   return (
                     <div
-                      key={index + "_" + icnindex}
+                      key={currentTraitName + "_" + index + "_" + icnindex}
                       className={`${styles["selectorButton"]} ${
                         styles["selector-button"]
-                      } ${styles[`coll-${currentTraitName}`]} ${
-                        active ? styles["active"] : ""
-                      }`}
+                      } ${active ? styles["active"] : ""}`}
                       onClick={() => {
                         !isMute && play()
-                        console.log("select trait", item)
                         selectTrait(item, icnindex)
                       }}
                     >
@@ -375,21 +379,10 @@ export default function Selector() {
                             : styles["tickStyleInActive"]
                         }
                       />
-                      {selectValue === item.id && loadedPercent > 0 && (
-                        <div className={styles["loading-trait"]}>
-                          {loadedPercent}%
-                        </div>
-                      )}
                     </div>
                   )
                 })
               } else {
-                console.log("avatar", avatar)
-                console.log("currentTraitName", currentTraitName)
-                console.log(
-                  "avatar[currentTraitName]",
-                  avatar[currentTraitName],
-                )
                 const traitActive =
                   avatar[currentTraitName] &&
                   avatar[currentTraitName].traitInfo.id === item.id
@@ -423,11 +416,6 @@ export default function Selector() {
                           : styles["tickStyleInActive"]
                       }
                     />
-                    {selectValue === item.id && loadedPercent > 0 && (
-                      <div className={styles["loading-trait"]}>
-                        {loadedPercent}%
-                      </div>
-                    )}
                   </div>
                 )
               }
